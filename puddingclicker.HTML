@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pudding Clicker</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a0a2e;
+    --panel: #2a1045;
+    --panel2: #3a1860;
+    --accent: #f9c74f;
+    --accent2: #f77f00;
+    --pudding: #f4a261;
+    --cream: #fff8ee;
+    --text: #fde8c8;
+    --muted: #b89dcc;
+    --green: #90be6d;
+    --blue: #4cc9f0;
+    --pink: #f72585;
+    --glow: rgba(249,199,79,0.25);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;user-select:none}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(247,127,0,0.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(76,201,240,0.06) 0%,transparent 50%),radial-gradient(ellipse at 60% 80%,rgba(247,37,133,0.05) 0%,transparent 50%);pointer-events:none;z-index:0}
+  #particle-canvas{position:fixed;inset:0;pointer-events:none;z-index:0}
+  #app{display:flex;height:100vh;position:relative;z-index:1}
+
+  #left-panel{width:230px;flex-shrink:0;background:var(--panel);border-right:2px solid rgba(249,199,79,0.15);display:flex;flex-direction:column;overflow-y:auto;padding-bottom:12px}
+  #stats-box{padding:16px 14px 12px;border-bottom:1px solid rgba(255,255,255,0.07)}
+  #stats-box h2{font-family:'Fredoka One',cursive;color:var(--accent);font-size:1.1rem;letter-spacing:1px;margin-bottom:6px}
+  .stat-row{font-size:0.78rem;color:var(--muted);line-height:1.7}
+  .stat-val{color:var(--cream);font-weight:700}
+
+  #upgrades-panel{padding:10px 10px 0}
+  #upgrades-panel h3{font-family:'Fredoka One',cursive;font-size:0.95rem;color:var(--accent2);letter-spacing:1px;margin-bottom:8px}
+  .upgrade-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:7px 9px;margin-bottom:6px;cursor:pointer;transition:all 0.18s;overflow:hidden}
+  .upgrade-item:hover:not(.locked){border-color:var(--accent);box-shadow:0 0 12px var(--glow);transform:translateX(2px)}
+  .upgrade-item.locked{opacity:0.4;cursor:not-allowed}
+  .upgrade-icon{font-size:1.5rem;flex-shrink:0}
+  .upgrade-info{flex:1;min-width:0}
+  .upgrade-name{font-size:0.75rem;font-weight:800;color:var(--cream);line-height:1.2}
+  .upgrade-cost{font-size:0.68rem;color:var(--accent)}
+  .upgrade-desc{font-size:0.62rem;color:var(--muted);line-height:1.3;margin-top:1px}
+
+  #heavenly-panel{margin-top:10px;padding:0 10px}
+  #heavenly-panel h3{font-family:'Fredoka One',cursive;font-size:0.9rem;color:var(--pink);margin-bottom:8px;letter-spacing:1px}
+  .h-upgrade{display:flex;align-items:center;gap:8px;background:rgba(247,37,133,0.08);border:1px solid rgba(247,37,133,0.2);border-radius:10px;padding:7px 9px;margin-bottom:5px;cursor:pointer;transition:all 0.18s}
+  .h-upgrade:hover:not(.locked):not(.owned){border-color:var(--pink);box-shadow:0 0 10px rgba(247,37,133,0.25)}
+  .h-upgrade.locked{opacity:0.35;cursor:not-allowed}
+  .h-upgrade.owned{border-color:rgba(247,37,133,0.5);opacity:0.6;cursor:default}
+  .h-upgrade .upgrade-cost{color:var(--pink)}
+
+  #ach-panel{padding:10px 10px 0;border-top:1px solid rgba(255,255,255,0.07);margin-top:10px}
+  #ach-panel h3{font-family:'Fredoka One',cursive;font-size:0.9rem;color:var(--blue);margin-bottom:6px;letter-spacing:1px}
+  .ach-grid{display:flex;flex-wrap:wrap;gap:4px}
+  .ach-badge{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1rem;background:var(--panel2);border:1px solid rgba(76,201,240,0.2);cursor:default;transition:transform 0.15s}
+  .ach-badge.earned{border-color:var(--blue);box-shadow:0 0 8px rgba(76,201,240,0.3)}
+  .ach-badge.earned:hover{transform:scale(1.2)}
+  .ach-badge:not(.earned){opacity:0.2}
+
+  #wipe-btn{margin:8px 10px 0;background:rgba(255,50,50,0.1);border:1px solid rgba(255,50,50,0.2);border-radius:8px;padding:5px 10px;font-size:0.65rem;color:rgba(255,100,100,0.6);cursor:pointer;transition:all 0.2s}
+  #wipe-btn:hover{color:#ff6464;border-color:rgba(255,50,50,0.5)}
+
+  #center-panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:24px 20px;position:relative;overflow:hidden}
+  @keyframes screen-shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-2px,1px)}50%{transform:translate(2px,-1px)}75%{transform:translate(-1px,-2px)}}
+  #center-panel.shake{animation:screen-shake 0.15s ease}
+
+  #prestige-bar{display:flex;align-items:center;gap:10px;background:rgba(247,37,133,0.12);border:1px solid rgba(247,37,133,0.3);border-radius:30px;padding:6px 16px;margin-bottom:20px;font-size:0.8rem;font-weight:700;color:var(--pink)}
+  #prestige-bar span{font-size:1.1rem}
+
+  #pudding-count{font-family:'Fredoka One',cursive;font-size:2.4rem;color:var(--accent);text-shadow:0 0 30px var(--glow);letter-spacing:1px;text-align:center;line-height:1.1;transition:transform 0.08s}
+  #pudding-count.bump{transform:scale(1.05)}
+  #pudding-per-sec{font-size:0.85rem;color:var(--muted);margin-top:4px;margin-bottom:24px}
+
+  #pudding-wrapper{position:relative;margin-bottom:20px;cursor:pointer}
+  #pudding-btn{width:180px;height:180px;border-radius:50%;border:none;background:none;cursor:pointer;position:relative;transition:transform 0.08s cubic-bezier(.17,.67,.83,.67),filter 0.2s;filter:drop-shadow(0 8px 24px rgba(244,162,97,0.4));animation:pudding-idle 2s ease-in-out infinite}
+  #pudding-btn:hover{filter:drop-shadow(0 10px 32px rgba(244,162,97,0.55)) brightness(1.05)}
+  #pudding-btn:active{transform:scale(0.88) rotate(-2deg);animation:none}
+  #pudding-btn svg{width:100%;height:100%}
+  @keyframes pudding-idle{0%,100%{transform:scaleY(1) scaleX(1)}25%{transform:scaleY(1.03) scaleX(0.97)}75%{transform:scaleY(0.97) scaleX(1.03)}}
+
+  .click-float{position:absolute;pointer-events:none;font-family:'Fredoka One',cursive;font-size:1.3rem;color:var(--accent);text-shadow:0 2px 8px rgba(0,0,0,0.6);animation:floatup 0.9s ease-out forwards;z-index:100}
+  @keyframes floatup{0%{opacity:1;transform:translateY(0) scale(1)}50%{opacity:1}100%{opacity:0;transform:translateY(-90px) scale(0.5)}}
+  .click-spark{position:absolute;pointer-events:none;width:8px;height:8px;border-radius:50%;background:var(--accent);animation:spark 0.5s ease-out forwards;z-index:99}
+  @keyframes spark{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:var(--tx) scale(0)}}
+  .click-ring{position:absolute;pointer-events:none;border:3px solid var(--accent);border-radius:50%;animation:ring-expand 0.5s ease-out forwards;z-index:98}
+  @keyframes ring-expand{0%{width:20px;height:20px;opacity:0.8;transform:translate(-50%,-50%) scale(1)}100%{width:120px;height:120px;opacity:0;transform:translate(-50%,-50%) scale(1.5)}}
+
+  #ascend-btn{background:linear-gradient(135deg,var(--pink),#b5179e);border:none;border-radius:30px;padding:10px 24px;font-family:'Fredoka One',cursive;font-size:1rem;color:white;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 20px rgba(247,37,133,0.4);transition:all 0.2s;display:none}
+  #ascend-btn:hover{transform:scale(1.06);box-shadow:0 6px 28px rgba(247,37,133,0.6)}
+
+  #golden-pudding{position:fixed;width:60px;height:60px;border-radius:50%;cursor:pointer;background:radial-gradient(circle at 35% 35%,#fff59d,#f9c74f,#f77f00);box-shadow:0 0 20px 8px rgba(249,199,79,0.6);border:3px solid #fff176;animation:golden-bob 1s ease-in-out infinite alternate,golden-glow 0.5s ease-in-out infinite alternate;z-index:200;display:none;transition:transform 0.15s}
+  #golden-pudding:hover{transform:scale(1.15)}
+  @keyframes golden-bob{from{transform:translateY(0)}to{transform:translateY(-8px)}}
+  @keyframes golden-glow{from{box-shadow:0 0 20px 8px rgba(249,199,79,0.6)}to{box-shadow:0 0 35px 14px rgba(249,199,79,0.9)}}
+  #golden-pudding span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.8rem}
+
+  #milestone-toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f9c74f,#f77f00);color:#1a0a2e;font-family:'Fredoka One',cursive;font-size:1.1rem;padding:12px 28px;border-radius:40px;box-shadow:0 4px 24px rgba(249,199,79,0.5);z-index:300;display:none}
+  @keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(-20px) scale(0.8)}to{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}}
+
+  #save-indicator{position:fixed;bottom:30px;right:16px;font-size:0.7rem;color:var(--green);opacity:0;transition:opacity 0.3s;z-index:300;pointer-events:none;font-weight:700}
+  #save-indicator.show{opacity:1}
+
+  #ascend-modal{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:500}
+  #ascend-modal.open{display:flex}
+  .modal-box{background:linear-gradient(135deg,#2a1045,#1a0a2e);border:2px solid var(--pink);border-radius:20px;padding:36px 40px;max-width:440px;width:90%;text-align:center;box-shadow:0 0 60px rgba(247,37,133,0.3);animation:modal-pop 0.3s ease}
+  @keyframes modal-pop{from{transform:scale(0.85);opacity:0}to{transform:scale(1);opacity:1}}
+  .modal-box h2{font-family:'Fredoka One',cursive;font-size:2rem;color:var(--pink);margin-bottom:10px}
+  .modal-box p{color:var(--muted);font-size:0.9rem;line-height:1.6;margin-bottom:20px}
+  .modal-box .heavenly{font-size:2rem;color:var(--accent);font-family:'Fredoka One',cursive}
+  .modal-btns{display:flex;gap:12px;justify-content:center;margin-top:20px}
+  .modal-btn{padding:10px 24px;border-radius:30px;border:none;font-family:'Fredoka One',cursive;font-size:1rem;cursor:pointer;transition:all 0.18s}
+  .modal-btn.confirm{background:linear-gradient(135deg,var(--pink),#b5179e);color:white;box-shadow:0 4px 16px rgba(247,37,133,0.4)}
+  .modal-btn.confirm:hover{transform:scale(1.05)}
+  .modal-btn.cancel{background:var(--panel2);color:var(--muted);border:1px solid rgba(255,255,255,0.1)}
+  .modal-btn.cancel:hover{color:var(--cream)}
+
+  #right-panel{width:250px;flex-shrink:0;background:var(--panel);border-left:2px solid rgba(249,199,79,0.15);display:flex;flex-direction:column;overflow-y:auto;padding-bottom:12px}
+  #buildings-header{padding:14px 14px 8px;border-bottom:1px solid rgba(255,255,255,0.07);font-family:'Fredoka One',cursive;font-size:1.1rem;color:var(--accent);letter-spacing:1px}
+  .building-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.15s;position:relative}
+  .building-item:hover:not(.locked){background:rgba(255,255,255,0.04)}
+  .building-item.locked{opacity:0.35;cursor:not-allowed}
+  .building-item.affordable{border-left:3px solid var(--green)}
+  .building-icon{font-size:1.6rem;width:32px;text-align:center;flex-shrink:0}
+  .building-info{flex:1;min-width:0}
+  .building-name{font-size:0.78rem;font-weight:800;color:var(--cream)}
+  .building-cost{font-size:0.68rem;color:var(--accent)}
+  .building-cps{font-size:0.62rem;color:var(--muted)}
+  .building-count{font-family:'Fredoka One',cursive;font-size:1.4rem;color:var(--accent2);min-width:28px;text-align:right}
+
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(249,199,79,0.2);border-radius:4px}
+
+  #news-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.7);border-top:1px solid rgba(249,199,79,0.15);padding:6px 16px;font-size:0.72rem;color:var(--muted);overflow:hidden;white-space:nowrap;z-index:50}
+  #news-ticker{display:inline-block;animation:ticker 25s linear infinite}
+  @keyframes ticker{from{transform:translateX(100vw)}to{transform:translateX(-100%)}}
+</style>
+</head>
+<body>
+<canvas id="particle-canvas"></canvas>
+<div id="app">
+  <div id="left-panel">
+    <div id="stats-box">
+      <h2>📊 STATS</h2>
+      <div class="stat-row">Total baked: <span class="stat-val" id="stat-total">0</span></div>
+      <div class="stat-row">Per click: <span class="stat-val" id="stat-cpc">1</span></div>
+      <div class="stat-row">Per second: <span class="stat-val" id="stat-cps">0</span></div>
+      <div class="stat-row">Ascensions: <span class="stat-val" id="stat-asc">0</span></div>
+      <div class="stat-row">Heavenly chips: <span class="stat-val" id="stat-chips">0</span></div>
+      <div class="stat-row">Play time: <span class="stat-val" id="stat-time">0s</span></div>
+    </div>
+    <div id="upgrades-panel"><h3>✨ UPGRADES</h3><div id="upgrades-list"></div></div>
+    <div id="heavenly-panel"><h3>🌟 HEAVENLY</h3><div id="heavenly-list"></div></div>
+    <div id="ach-panel"><h3>🏆 ACHIEVEMENTS</h3><div class="ach-grid" id="ach-grid"></div></div>
+    <button id="wipe-btn" onclick="wipeSave()">⚠ Wipe Save</button>
+  </div>
+  <div id="center-panel">
+    <div id="prestige-bar"><span>✨</span> Ascension <strong id="asc-level">0</strong> &nbsp;|&nbsp; Heavenly Chips: <strong id="hc-count">0</strong></div>
+    <div id="pudding-count">0 puddings</div>
+    <div id="pudding-per-sec">0 per second</div>
+    <div id="pudding-wrapper">
+      <button id="pudding-btn" onclick="clickPudding(event)">
+        <svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <radialGradient id="bg1" cx="40%" cy="35%" r="65%"><stop offset="0%" stop-color="#f8c078"/><stop offset="100%" stop-color="#e87c3a"/></radialGradient>
+            <radialGradient id="bg2" cx="40%" cy="30%" r="70%"><stop offset="0%" stop-color="#fcd9a8"/><stop offset="100%" stop-color="#f4a261"/></radialGradient>
+            <radialGradient id="bg3" cx="35%" cy="30%" r="60%"><stop offset="0%" stop-color="#ff6b7a"/><stop offset="100%" stop-color="#c1121f"/></radialGradient>
+          </defs>
+          <ellipse cx="90" cy="162" rx="56" ry="10" fill="rgba(0,0,0,0.25)"/>
+          <ellipse cx="90" cy="110" rx="72" ry="52" fill="url(#bg1)"/>
+          <ellipse cx="90" cy="90" rx="68" ry="62" fill="url(#bg2)"/>
+          <ellipse cx="72" cy="62" rx="22" ry="16" fill="rgba(255,255,255,0.2)"/>
+          <ellipse cx="90" cy="36" rx="40" ry="22" fill="#fff8ee"/>
+          <path d="M50 42 Q44 56 52 60 Q46 70 56 72 Q50 84 62 84 Q72 92 90 90 Q108 92 118 84 Q130 84 124 72 Q134 70 128 60 Q136 56 130 42 Q110 28 70 28 Q60 28 50 42Z" fill="#fff8ee"/>
+          <ellipse cx="78" cy="38" rx="12" ry="7" fill="rgba(255,255,255,0.5)"/>
+          <circle cx="90" cy="22" r="11" fill="url(#bg3)"/>
+          <circle cx="86" cy="18" r="4" fill="rgba(255,255,255,0.35)"/>
+          <path d="M90 11 Q95 4 100 8" stroke="#5a3e28" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <circle cx="76" cy="85" r="5" fill="#5a3e28"/><circle cx="104" cy="85" r="5" fill="#5a3e28"/>
+          <circle cx="77.5" cy="83.5" r="1.8" fill="white"/><circle cx="105.5" cy="83.5" r="1.8" fill="white"/>
+          <path d="M78 96 Q90 106 102 96" stroke="#5a3e28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <ellipse cx="65" cy="93" rx="8" ry="5" fill="rgba(231,111,81,0.35)"/>
+          <ellipse cx="115" cy="93" rx="8" ry="5" fill="rgba(231,111,81,0.35)"/>
+          <ellipse cx="90" cy="140" rx="64" ry="20" fill="#c1440e" opacity="0.4"/>
+        </svg>
+      </button>
+    </div>
+    <button id="ascend-btn" onclick="showAscendModal()">🌟 ASCEND</button>
+    <div style="margin-top:16px;font-size:0.72rem;color:var(--muted);text-align:center;max-width:300px;line-height:1.6" id="flavor-text">Click the pudding to start your empire of wobbles!</div>
+  </div>
+  <div id="right-panel">
+    <div id="buildings-header">🏭 BUILDINGS</div>
+    <div id="buildings-list"></div>
+  </div>
+</div>
+<div id="golden-pudding" onclick="clickGolden()"><span>🌟</span></div>
+<div id="milestone-toast"></div>
+<div id="save-indicator">💾 Saved!</div>
+<div id="ascend-modal">
+  <div class="modal-box">
+    <h2>🌟 Ascend?</h2>
+    <p>Reset your puddings and buildings to gain <span class="heavenly" id="modal-chips">0</span> Heavenly Chips.<br><br>Heavenly Chips boost production permanently!</p>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeAscendModal()">Stay Put</button>
+      <button class="modal-btn confirm" onclick="doAscend()">Ascend! ✨</button>
+    </div>
+  </div>
+</div>
+<div id="news-bar"><span id="news-ticker">📰 Welcome to Pudding Clicker!</span></div>
+
+<script>
+const SAVE_KEY='pudding_v4', MULTS_KEY='pudding_m4';
+
+let G={
+  puddings:0,totalPuddings:0,allTimePuddings:0,
+  cps:0,cpc:1,ascensions:0,
+  heavenlyChips:0,totalHeavenlyChips:0,
+  buildings:{},upgrades:{},heavenlyUpgrades:{},achievements:{},
+  goldenActive:false,goldenMult:1,
+  lastSave:Date.now(),startTime:Date.now(),totalClicks:0
+};
+
+let buildingMults={}, globalMult=1;
+
+// === DATA ===
+const BUILDINGS=[
+  {id:'spoon',name:'Pudding Spoon',icon:'🥄',baseCost:15,baseCps:0.1},
+  {id:'bowl',name:'Pudding Bowl',icon:'🥣',baseCost:100,baseCps:0.5},
+  {id:'mixer',name:'Pudding Mixer',icon:'🌀',baseCost:500,baseCps:3},
+  {id:'oven',name:'Pudding Oven',icon:'🔥',baseCost:2000,baseCps:10},
+  {id:'factory',name:'Pudding Factory',icon:'🏭',baseCost:15000,baseCps:50},
+  {id:'farm',name:'Pudding Farm',icon:'🌾',baseCost:100000,baseCps:200},
+  {id:'lab',name:'Pudding Lab',icon:'🧪',baseCost:750000,baseCps:700},
+  {id:'portal',name:'Pudding Portal',icon:'🌀',baseCost:5e6,baseCps:3000},
+  {id:'timemachine',name:'Time Machine',icon:'⏰',baseCost:5e7,baseCps:15000},
+  {id:'galaxy',name:'Pudding Galaxy',icon:'🌌',baseCost:5e8,baseCps:100000}
+];
+const UPGRADES=[
+  {id:'u1',name:'Silver Spoon',icon:'🥄',cost:100,desc:'Spoons 2x',req:()=>owned('spoon')>=1,effect:()=>setBM('spoon',2)},
+  {id:'u2',name:'Golden Spoon',icon:'✨',cost:1000,desc:'Spoons 4x',req:()=>owned('spoon')>=10,effect:()=>setBM('spoon',4)},
+  {id:'u3',name:'Deep Bowl',icon:'🥣',cost:500,desc:'Bowls 2x',req:()=>owned('bowl')>=1,effect:()=>setBM('bowl',2)},
+  {id:'u4',name:'Turbo Bowl',icon:'💨',cost:5000,desc:'Bowls 4x',req:()=>owned('bowl')>=10,effect:()=>setBM('bowl',4)},
+  {id:'u5',name:'Power Mixer',icon:'⚡',cost:3000,desc:'Mixers 2x',req:()=>owned('mixer')>=1,effect:()=>setBM('mixer',2)},
+  {id:'u6',name:'Turbo Mixer',icon:'🌪',cost:30000,desc:'Mixers 4x',req:()=>owned('mixer')>=10,effect:()=>setBM('mixer',4)},
+  {id:'u7',name:'Nimble Fingers',icon:'👆',cost:200,desc:'+1 click',req:()=>G.totalPuddings>=100,effect:()=>G.cpc+=1},
+  {id:'u8',name:'Sugar Rush',icon:'🍬',cost:2000,desc:'+5 click',req:()=>G.totalPuddings>=1000,effect:()=>G.cpc+=5},
+  {id:'u9',name:'Pudding Punch',icon:'👊',cost:20000,desc:'+15 click',req:()=>G.totalPuddings>=10000,effect:()=>G.cpc+=15},
+  {id:'u10',name:'Wobble Force',icon:'💪',cost:250000,desc:'+100 click',req:()=>G.totalPuddings>=100000,effect:()=>G.cpc+=100},
+  {id:'u11',name:'Double Dip',icon:'✌️',cost:500000,desc:'Click ×2',req:()=>G.totalPuddings>=500000,effect:()=>G.cpc*=2},
+  {id:'u12',name:'Convection Oven',icon:'♨️',cost:20000,desc:'Ovens 2x',req:()=>owned('oven')>=1,effect:()=>setBM('oven',2)},
+  {id:'u13',name:'Automation',icon:'🤖',cost:150000,desc:'Factories 2x',req:()=>owned('factory')>=1,effect:()=>setBM('factory',2)},
+  {id:'u14',name:'Pudding Fever',icon:'🌡️',cost:1e6,desc:'All ×2',req:()=>G.totalPuddings>=1e6,effect:()=>{globalMult*=2}},
+  {id:'u15',name:'Pudding Mania',icon:'🤪',cost:1e8,desc:'All ×4',req:()=>G.totalPuddings>=5e7,effect:()=>{globalMult*=4}}
+];
+const HEAVENLY=[
+  {id:'h1',name:'Heavenly Start',icon:'🌤',cost:1,desc:'Start with 10 spoons',req:()=>G.totalHeavenlyChips>=1},
+  {id:'h2',name:'Divine Touch',icon:'🖐',cost:5,desc:'Click ×1.5',req:()=>G.totalHeavenlyChips>=5},
+  {id:'h3',name:'Eternal Wobble',icon:'♾',cost:25,desc:'CPS ×1.25',req:()=>G.totalHeavenlyChips>=10},
+  {id:'h4',name:'Golden Blessing',icon:'⭐',cost:50,desc:'Golden 2× often',req:()=>G.totalHeavenlyChips>=25},
+  {id:'h5',name:'Pudding Nirvana',icon:'🕉',cost:200,desc:'CPS ×1.5',req:()=>G.totalHeavenlyChips>=100},
+  {id:'h6',name:'Transcendent Hands',icon:'🙌',cost:500,desc:'Click ×2',req:()=>G.totalHeavenlyChips>=250}
+];
+const ACHS=[
+  {id:'first_click',name:'First Wobble',icon:'👶',desc:'Click once'},
+  {id:'hundred',name:'Century Club',icon:'💯',desc:'100 puddings'},
+  {id:'thousand',name:'Pudding Thousand',icon:'🎉',desc:'1K puddings'},
+  {id:'million',name:'Millionaire',icon:'💰',desc:'1M puddings'},
+  {id:'billion',name:'Billionaire',icon:'🤑',desc:'1B puddings'},
+  {id:'ascend1',name:'Enlightened',icon:'✨',desc:'Ascend once'},
+  {id:'ascend5',name:'Eternal Wobbler',icon:'🌟',desc:'Ascend 5x'},
+  {id:'golden',name:'Golden Touch',icon:'🌙',desc:'Click golden'},
+  {id:'buildings10',name:'Pudding Empire',icon:'🏛',desc:'10 buildings'},
+  {id:'buildings100',name:'Wobble Corp',icon:'🌆',desc:'100 buildings'},
+  {id:'clicks100',name:'Clicker',icon:'👆',desc:'100 clicks'},
+  {id:'clicks1000',name:'Turbo Clicker',icon:'⚡',desc:'1000 clicks'}
+];
+const NEWS=["Local pudding enthusiast reports 'unstoppable wobble'.","Scientists baffled by infinite pudding loop.","Pudding futures hit all-time highs.","Mayor declares pudding the official dessert.","Pudding clicking reduces stress by 94%.","500 trillion puddings imported.","Heavenly Chips: the new crypto.","Pudding Lab discovers quantum wobble.","Time travelers confirm: pudding reigns supreme.","Pudding declared a fundamental force."];
+
+// === HELPERS ===
+function owned(id){return G.buildings[id]||0}
+function hOwned(id){return G.heavenlyUpgrades[id]||false}
+function setBM(id,m){buildingMults[id]=Math.max(buildingMults[id]||1,m)}
+function totalB(){return BUILDINGS.reduce((s,b)=>s+owned(b.id),0)}
+function bCost(b){return Math.ceil(b.baseCost*Math.pow(1.15,owned(b.id)))}
+function chipsFor(p){return Math.floor(Math.pow(p/1e12,0.5))}
+
+function recalc(){
+  let cps=0,hm=1;
+  if(hOwned('h3')) hm*=1.25;
+  if(hOwned('h5')) hm*=1.5;
+  const cb=1+G.totalHeavenlyChips*0.01;
+  for(const b of BUILDINGS) cps+=owned(b.id)*b.baseCps*(buildingMults[b.id]||1);
+  G.cps=cps*globalMult*hm*G.goldenMult*cb;
+}
+
+function fmt(n){
+  if(n<0)return'-'+fmt(-n);
+  if(n<1000)return Math.floor(n).toLocaleString();
+  if(n<1e6)return(n/1e3).toFixed(1)+'K';
+  if(n<1e9)return(n/1e6).toFixed(2)+'M';
+  if(n<1e12)return(n/1e9).toFixed(2)+'B';
+  if(n<1e15)return(n/1e12).toFixed(2)+'T';
+  return(n/1e15).toFixed(2)+'Q';
+}
+function fmtT(ms){const s=Math.floor(ms/1000);if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m '+s%60+'s';return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m'}
+
+// === PARTICLES ===
+const pc=document.getElementById('particle-canvas'),px=pc.getContext('2d');
+let pts=[];
+function rsz(){pc.width=innerWidth;pc.height=innerHeight}
+rsz();addEventListener('resize',rsz);
+function addPt(){
+  if(pts.length>35)return;
+  pts.push({x:Math.random()*pc.width,y:pc.height+10,vx:(Math.random()-.5)*.3,vy:-(0.3+Math.random()*.5),sz:2+Math.random()*3,a:.15+Math.random()*.2,c:['#f9c74f','#f4a261','#f77f00','#4cc9f0','#f72585'][Math.floor(Math.random()*5)],l:0,ml:300+Math.random()*200});
+}
+function drawPts(){
+  px.clearRect(0,0,pc.width,pc.height);
+  for(let i=pts.length-1;i>=0;i--){
+    const p=pts[i];p.x+=p.vx;p.y+=p.vy;p.l++;
+    if(p.l>p.ml||p.y<-10){pts.splice(i,1);continue}
+    const f=1-p.l/p.ml;
+    px.globalAlpha=p.a*f;px.fillStyle=p.c;
+    px.beginPath();px.arc(p.x,p.y,p.sz*f,0,Math.PI*2);px.fill();
+  }
+  px.globalAlpha=1;
+}
+
+// === CLICK ===
+function clickPudding(e){
+  let gain=G.cpc;
+  if(hOwned('h2'))gain*=1.5;
+  if(hOwned('h6'))gain*=2;
+  gain=Math.max(1,Math.floor(gain));
+  G.puddings+=gain;G.totalPuddings+=gain;G.allTimePuddings+=gain;G.totalClicks++;
+  earn('first_click');
+  if(G.totalClicks>=100)earn('clicks100');
+  if(G.totalClicks>=1000)earn('clicks1000');
+
+  const w=document.getElementById('pudding-wrapper'),r=w.getBoundingClientRect();
+  const rx=e.clientX-r.left,ry=e.clientY-r.top;
+
+  const fl=document.createElement('div');fl.className='click-float';
+  fl.textContent='+'+fmt(gain);
+  fl.style.left=(rx-20+(Math.random()*20-10))+'px';fl.style.top=(ry-20)+'px';
+  w.appendChild(fl);setTimeout(()=>fl.remove(),900);
+
+  const rn=document.createElement('div');rn.className='click-ring';
+  rn.style.left=rx+'px';rn.style.top=ry+'px';
+  w.appendChild(rn);setTimeout(()=>rn.remove(),500);
+
+  for(let i=0;i<5;i++){
+    const el=document.createElement('div');el.className='click-spark';
+    const a=Math.random()*Math.PI*2,d=30+Math.random()*50;
+    el.style.left=rx+'px';el.style.top=ry+'px';
+    el.style.setProperty('--tx',`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px)`);
+    el.style.background=['var(--accent)','var(--pudding)','var(--pink)','var(--blue)'][Math.floor(Math.random()*4)];
+    w.appendChild(el);setTimeout(()=>el.remove(),500);
+  }
+  if(gain>50){const c=document.getElementById('center-panel');c.classList.add('shake');setTimeout(()=>c.classList.remove('shake'),150)}
+  const ct=document.getElementById('pudding-count');ct.classList.add('bump');setTimeout(()=>ct.classList.remove('bump'),100);
+  for(let i=0;i<2;i++)addPt();
+  checkMilestones();
+}
+
+// === BUY ===
+function buyBuilding(id){
+  const b=BUILDINGS.find(x=>x.id===id),cost=bCost(b);
+  if(G.puddings<cost)return;
+  G.puddings-=cost;G.buildings[id]=(G.buildings[id]||0)+1;
+  recalc();checkMilestones();
+}
+function buyUpgrade(id){
+  if(G.upgrades[id])return;
+  const u=UPGRADES.find(x=>x.id===id);
+  if(!u||!u.req()||G.puddings<u.cost)return;
+  G.puddings-=u.cost;G.upgrades[id]=true;u.effect();
+  recalc();showToast('✨ '+u.name+'!');
+}
+function buyHeavenlyU(id){
+  if(G.heavenlyUpgrades[id])return;
+  const u=HEAVENLY.find(x=>x.id===id);
+  if(!u||!u.req()||G.heavenlyChips<u.cost)return;
+  G.heavenlyChips-=u.cost;G.heavenlyUpgrades[id]=true;
+  recalc();showToast('🌟 '+u.name+'!');
+}
+
+// === ACHIEVEMENTS ===
+function earn(id){if(G.achievements[id])return;G.achievements[id]=true;const a=ACHS.find(x=>x.id===id);if(a)showToast('🏆 '+a.name);renderAch()}
+function checkMilestones(){
+  if(G.totalPuddings>=100)earn('hundred');
+  if(G.totalPuddings>=1000)earn('thousand');
+  if(G.totalPuddings>=1e6)earn('million');
+  if(G.totalPuddings>=1e9)earn('billion');
+  if(G.ascensions>=1)earn('ascend1');
+  if(G.ascensions>=5)earn('ascend5');
+  if(totalB()>=10)earn('buildings10');
+  if(totalB()>=100)earn('buildings100');
+  if(chipsFor(G.totalPuddings)>0||G.ascensions>0)document.getElementById('ascend-btn').style.display='block';
+}
+
+// === TOAST ===
+let tt=null;
+function showToast(m){const t=document.getElementById('milestone-toast');t.textContent=m;t.style.display='block';t.style.animation='none';t.offsetHeight;t.style.animation='toast-in 0.4s ease';if(tt)clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',3000)}
+
+// === GOLDEN ===
+let gi=null;
+function schedGolden(){const b=hOwned('h4')?20000:40000;gi=setTimeout(spawnGolden,b+Math.random()*b)}
+function spawnGolden(){const el=document.getElementById('golden-pudding');el.style.left=(60+Math.random()*(innerWidth-140))+'px';el.style.top=(60+Math.random()*(innerHeight-200))+'px';el.style.display='block';G.goldenActive=true;setTimeout(()=>{el.style.display='none';G.goldenActive=false;schedGolden()},13000)}
+function clickGolden(){
+  if(!G.goldenActive)return;earn('golden');
+  document.getElementById('golden-pudding').style.display='none';G.goldenActive=false;clearTimeout(gi);
+  const r=Math.random();
+  if(r<.33){G.goldenMult=7;recalc();showToast('🌟 Frenzy! 7× for 77s!');setTimeout(()=>{G.goldenMult=1;recalc()},77000)}
+  else if(r<.66){const b=Math.max(15*G.cps,100);G.puddings+=b;G.totalPuddings+=b;G.allTimePuddings+=b;showToast('🍀 Lucky! +'+fmt(b)+'!')}
+  else{const cb=Math.floor(G.cps*.5+1);G.cpc+=cb;showToast('✋ Click Frenzy 13s!');setTimeout(()=>{G.cpc=Math.max(1,G.cpc-cb)},13000)}
+  schedGolden();
+}
+
+// === ASCENSION ===
+function showAscendModal(){document.getElementById('modal-chips').textContent=fmt(chipsFor(G.totalPuddings))+' 🌟';document.getElementById('ascend-modal').classList.add('open')}
+function closeAscendModal(){document.getElementById('ascend-modal').classList.remove('open')}
+function doAscend(){
+  const c=chipsFor(G.totalPuddings);
+  G.heavenlyChips+=c;G.totalHeavenlyChips+=c;G.ascensions++;
+  G.puddings=0;G.totalPuddings=0;G.buildings={};G.upgrades={};
+  G.cpc=1;G.cps=0;buildingMults={};globalMult=1;G.goldenMult=1;
+  if(hOwned('h1'))G.buildings['spoon']=10;
+  earn('ascend1');closeAscendModal();
+  showToast('✨ Ascended! +'+fmt(c)+' chips!');
+  recalc();renderAll();saveGame();
+}
+
+// === RENDER — only update DOM diffs, no innerHTML thrashing ===
+let buildingEls=[], upgradeEls=[], heavenlyEls=[];
+
+function renderBuildings(){
+  const list=document.getElementById('buildings-list');
+  // Create elements once
+  if(buildingEls.length===0){
+    list.innerHTML='';
+    for(const b of BUILDINGS){
+      const d=document.createElement('div');
+      d.className='building-item locked';
+      d.innerHTML=`<div class="building-icon">${b.icon}</div><div class="building-info"><div class="building-name">${b.name}</div><div class="building-cost bc-${b.id}">0</div><div class="building-cps">${b.baseCps} cps each</div></div><div class="building-count bn-${b.id}">0</div>`;
+      d.addEventListener('click',()=>buyBuilding(b.id));
+      list.appendChild(d);
+      buildingEls.push({el:d,id:b.id});
+    }
+  }
+  // Update values only
+  for(const be of buildingEls){
+    const b=BUILDINGS.find(x=>x.id===be.id);
+    const cost=bCost(b),cnt=owned(b.id),can=G.puddings>=cost;
+    be.el.className='building-item'+(can?' affordable':' locked');
+    be.el.querySelector('.bc-'+b.id).textContent=fmt(cost)+' 🍮';
+    be.el.querySelector('.bn-'+b.id).textContent=cnt;
+  }
+}
+
+function renderUpgrades(){
+  const list=document.getElementById('upgrades-list');
+  // Rebuild only when ownership changes
+  const vis=UPGRADES.filter(u=>!G.upgrades[u.id]);
+  if(upgradeEls.length!==vis.length||upgradeEls.some((e,i)=>e.id!==vis[i].id)){
+    list.innerHTML='';upgradeEls=[];
+    for(const u of vis){
+      const d=document.createElement('div');
+      d.className='upgrade-item locked';
+      d.innerHTML=`<div class="upgrade-icon">${u.icon}</div><div class="upgrade-info"><div class="upgrade-name">${u.name}</div><div class="upgrade-cost uc-${u.id}">${fmt(u.cost)} 🍮</div><div class="upgrade-desc">${u.desc}</div></div>`;
+      d.addEventListener('click',()=>buyUpgrade(u.id));
+      list.appendChild(d);
+      upgradeEls.push({el:d,id:u.id,u});
+    }
+  }
+  // Update affordability
+  for(const ue of upgradeEls){
+    const avail=ue.u.req(),can=G.puddings>=ue.u.cost;
+    ue.el.className='upgrade-item'+(!avail||!can?' locked':'');
+  }
+}
+
+function renderHeavenlyU(){
+  const list=document.getElementById('heavenly-list');
+  if(heavenlyEls.length===0){
+    list.innerHTML='';
+    for(const u of HEAVENLY){
+      const d=document.createElement('div');
+      d.className='h-upgrade locked';
+      d.innerHTML=`<div class="upgrade-icon">${u.icon}</div><div class="upgrade-info"><div class="upgrade-name">${u.name}</div><div class="upgrade-cost hc-${u.id}">${fmt(u.cost)} ✨</div><div class="upgrade-desc">${u.desc}</div></div>`;
+      d.addEventListener('click',()=>buyHeavenlyU(u.id));
+      list.appendChild(d);
+      heavenlyEls.push({el:d,id:u.id,u});
+    }
+  }
+  for(const he of heavenlyEls){
+    const own=G.heavenlyUpgrades[he.id],avail=he.u.req(),can=G.heavenlyChips>=he.u.cost;
+    he.el.className='h-upgrade'+(own?' owned':!avail||!can?' locked':'');
+    he.el.querySelector('.hc-'+he.id).textContent=own?'✓ Owned':fmt(he.u.cost)+' ✨';
+  }
+}
+
+function renderAch(){
+  const g=document.getElementById('ach-grid');g.innerHTML='';
+  for(const a of ACHS){
+    const d=document.createElement('div');
+    d.className='ach-badge'+(G.achievements[a.id]?' earned':'');
+    d.textContent=a.icon;d.title=a.name+': '+a.desc;
+    g.appendChild(d);
+  }
+}
+
+function renderAll(){buildingEls=[];upgradeEls=[];heavenlyEls=[];renderBuildings();renderUpgrades();renderHeavenlyU();renderAch();updateUI()}
+
+// === GAME LOOP — fixed timestep for CPS, RAF for display ===
+const TICK_RATE = 1000/20; // 20 ticks per second for game logic
+let accumulator = 0;
+let lastFrame = performance.now();
+let lastPanelUpdate = 0;
+
+function gameLoop(now){
+  const frameDt = now - lastFrame;
+  lastFrame = now;
+  accumulator += frameDt;
+
+  // Fixed timestep game logic (20 ticks/sec)
+  while(accumulator >= TICK_RATE){
+    const dt = TICK_RATE / 1000;
+    if(G.cps > 0){
+      const gain = G.cps * dt;
+      G.puddings += gain;
+      G.totalPuddings += gain;
+      G.allTimePuddings += gain;
+    }
+    accumulator -= TICK_RATE;
+  }
+
+  // Ambient particles
+  if(G.cps>0 && Math.random()<Math.min(0.15, G.cps/500)) addPt();
+  drawPts();
+
+  // Smooth display update every frame
+  updateUI();
+
+  // Panel updates every 1 second (not every frame!)
+  lastPanelUpdate += frameDt;
+  if(lastPanelUpdate > 1000){
+    lastPanelUpdate = 0;
+    renderBuildings();
+    renderUpgrades();
+    renderHeavenlyU();
+    checkMilestones();
+  }
+
+  // Auto-save every 15s
+  if(Date.now()-G.lastSave>15000){G.lastSave=Date.now();saveGame()}
+
+  requestAnimationFrame(gameLoop);
+}
+
+// === UI UPDATE ===
+function updateUI(){
+  document.getElementById('pudding-count').textContent=fmt(G.puddings)+' puddings';
+  document.getElementById('pudding-per-sec').textContent=fmt(G.cps)+' per second';
+  document.getElementById('stat-total').textContent=fmt(G.allTimePuddings);
+  document.getElementById('stat-cpc').textContent=fmt(G.cpc);
+  document.getElementById('stat-cps').textContent=fmt(G.cps);
+  document.getElementById('stat-asc').textContent=G.ascensions;
+  document.getElementById('stat-chips').textContent=fmt(G.heavenlyChips);
+  document.getElementById('stat-time').textContent=fmtT(Date.now()-G.startTime);
+  document.getElementById('asc-level').textContent=G.ascensions;
+  document.getElementById('hc-count').textContent=fmt(G.heavenlyChips);
+  const fl=['Your pudding wobbles with purpose.','The scent of caramel fills the air.','Pudding: a renewable resource.','Every click echoes through eternity.','Even the cosmos craves a wobble.','Bake, ascend, repeat.'];
+  document.getElementById('flavor-text').textContent=fl[Math.floor(G.totalPuddings/1000)%fl.length];
+}
+
+// === SAVE/LOAD ===
+function saveGame(){
+  try{
+    localStorage.setItem(SAVE_KEY,JSON.stringify(G));
+    localStorage.setItem(MULTS_KEY,JSON.stringify({buildingMults,globalMult}));
+    const si=document.getElementById('save-indicator');si.classList.add('show');setTimeout(()=>si.classList.remove('show'),1500);
+  }catch(e){}
+}
+function loadGame(){
+  try{
+    const s=localStorage.getItem(SAVE_KEY);
+    if(s)Object.assign(G,JSON.parse(s));
+    const m=localStorage.getItem(MULTS_KEY);
+    if(m){const md=JSON.parse(m);buildingMults=md.buildingMults||{};globalMult=md.globalMult||1}
+    for(const u of UPGRADES){if(G.upgrades[u.id])u.effect()}
+    recalc();
+    if(G.lastSave){
+      const away=(Date.now()-G.lastSave)/1000;
+      if(away>5&&G.cps>0){
+        const off=G.cps*away*0.5;
+        G.puddings+=off;G.totalPuddings+=off;G.allTimePuddings+=off;
+        setTimeout(()=>showToast('💤 Welcome back! +'+fmt(off)+' offline puddings!'),500);
+      }
+    }
+  }catch(e){}
+}
+function wipeSave(){if(confirm('Really wipe your save?')){localStorage.removeItem(SAVE_KEY);localStorage.removeItem(MULTS_KEY);location.reload()}}
+addEventListener('beforeunload',()=>saveGame());
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame()});
+
+// === NEWS ===
+let ni=0;
+function cycleNews(){document.getElementById('news-ticker').textContent='📰 '+NEWS[ni%NEWS.length];ni++;setTimeout(cycleNews,26000)}
+
+// === INIT ===
+loadGame();
+renderAll();
+requestAnimationFrame(gameLoop);
+schedGolden();
+cycleNews();
+</script>
+</body>
+</html>
